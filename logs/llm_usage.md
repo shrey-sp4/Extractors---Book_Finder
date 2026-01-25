@@ -26,7 +26,7 @@ This log tracks technical interactions with the LLM to solve specific challenges
      ```
      
 * **Log 4: Fixing Text Encoding and HTML Tags**
-   * **Prompt:** "My book blurbs have HTML tags like <p> and symbols like &amp;. Can you help me write a function to clean the text so it's ready for an embedding model?"
+   * **Prompt:** "My book blurbs have HTML tags like '<p>' and symbols like '&amp;'. Can you help me write a function to clean the text so it's ready for an embedding model?"
    * **Solution:** Provided a script using re.sub() for tags and html.unescape() for character references.
 
 ---
@@ -53,4 +53,4 @@ This log tracks technical interactions with the LLM to solve specific challenges
 ### Phase 4: Serving (The Gateway)
 * **log 7: Uvicorn Server Setup**
    * **Prompt:** "How do I run my FastAPI app so it reloads automatically when I change the code?"
-   * **Solution:** Recommended running the server via the command line using uvicorn main:app --reload.**
+   * **Solution:** Recommended running the server via the command line using uvicorn main:app --reload.
