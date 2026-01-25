@@ -4,67 +4,53 @@ This log tracks technical interactions with the LLM to solve specific challenges
 ---
 
 ### Phase 1: Ingestion (The Collector)
-* **Log 1: Performance Optimization for Large Merges**
-    * **Prompt:** “I’m trying to merge two DataFrames (CSV and API data) with many rows, and it’s taking forever or crashing my RAM. Is there a faster way to do a left join on ISBNs?”
-    * **Solution:** Use indexes for joining and cast the ISBN column to a more efficient type to reduce the memory footprint.
-    ```python
-    # Optimization suggested by LLM
-    df1.set_index('isbn13', inplace=True)
-    df2.set_index('isbn13', inplace=True)
-    combined_df = df1.join(df2, how='left')
-    ```
-* **Log 2: Handling API KeyErrors**
-   * **Prompt:** "When I loop through the 'docs' from the API response, my code crashes because some books are missing the 'author_name' field. How do I skip these without stopping the whole loop?"
-   * **Solution:** Use the .get() method to handle missing keys safely.
+* **Log 1: Parsing Nested JSON from OpenLibrary API**
+   * **Prompt:** "I'm using the requests library to get book data from OpenLibrary. The ISBNs are inside a nested list like doc['isbn'][0]. How can I safely extract the first ISBN without the loop crashing when a book doesn't have an ISBN key?"
+   * **Solution:** Use the .get() method with a fallback to an empty list to prevent KeyError.
+   ```python  
+   isbn = book_data.get('isbn', [None])[0]
+  ```
+   
+* **Log 2: Concatenating API and CSV DataFrames**
+   * **Prompt:** "I have one DataFrame from a CSV and another from an API. They have different columns. How do I combine them into one master DataFrame using Pandas so I can start the cleaning phase?"
+   * **Solution:** Suggested using pd.concat() with axis=0 and ensuring the column names are aligned beforehand.   
 ---
 
 ### Phase 2: Transformation (The Refiner)
-* **Log 3: Handling "Dirty Data" and Null Values**
-    * **Prompt:** "In my transformation step, I have books with 'Description not available'. How do I treat these as nulls in Pandas so they don't interfere with future semantic search?"
-    * **Solution:** Use a replacement strategy to convert placeholder strings into actual null values for easy filtering.
-
-* **Log 4: Stripping HTML Tags**
-   * **Prompt:** "The book blurbs are full of <p>, &amp; tags. Can you give me a solution that cleans all HTML but keeps the text?"
-   * **Solution:** Use a regex pattern to find anything between brackets and replace it with an empty string.
+* **Log 3: Filtering "Dirty" Descriptions**
+   * **Prompt:** "In my transformation step, I'm seeing books where the description is just the string 'Description not available'. I need to treat these as nulls so I can drop them. What's the best way to do this in Pandas?"
+   * **Solution:** Use .replace() to convert the specific string to None or np.nan, followed by .dropna().
+     ```python
+      df['description'] = df['description'].replace('Description not available', None)
+      df = df.dropna(subset=['description'])
+     ```
+     
+* **Log 4: Fixing Text Encoding and HTML Tags**
+   * **Prompt:** "My book blurbs have HTML tags like <p> and symbols like &amp;. Can you help me write a function to clean the text so it's ready for an embedding model?"
+   * **Solution:** Provided a script using re.sub() for tags and html.unescape() for character references.
 
 ---
 
 ### Phase 3: Storage (The Library)
-* **Log 5: Resolving Circular Imports in SQLAlchemy**
-    * **Prompt:** “I’m getting an `ImportError` because my book models and schemas are importing each other. How do I fix this properly?”
-    * **Solution:** Used string forward references in the relationships to decouple the dependency graph.
+* **Log 5: Implementing SQLite Upsert Logic**
+   * **Prompt:** "I'm storing my cleaned books in a SQLite table. If I run my ingestion script twice, I get a 'Unique Constraint' error on the ISBN. How can I make SQL just ignore the duplicates?"
+   * **Solution:** Suggested using the INSERT OR IGNORE syntax in the SQL execution string.
     ```python
-    # Relationship with forward reference
-    author = relationship("Author", back_populates="books")
+    cursor.execute("INSERT OR IGNORE INTO books (isbn, title, description) VALUES (?, ?, ?)", ...)
     ```
 
-* **Log 6: Managing Database Connections in FastAPI**
-   * **Prompt:** "I noticed my database is getting too many open connections and slowing down. How do I make sure every session is closed automatically after a request is finished?"
-   * **Solution:** Use a generator with an async with block to ensure the session is always closed in the finally block.
+* **Log 6: FastAPI Row to Dictionary Conversion**
+   * **Prompt:** "I'm building my /books endpoint with FastAPI and sqlite3. The database returns tuples, but I need to return JSON objects with keys like 'title' and 'isbn'. How do I fix this?"
+   * **Solution:** Suggested setting conn.row_factory = sqlite3.Row so that query results can be converted to dictionaries easily..
     ```Python
-   
-   # Session management in database.py
-   async def get_db():
-       async with AsyncSessionLocal() as session:
-           try:
-               yield session
-           finally:
-               await session.close()
+   conn.row_factory = sqlite3.Row
+   cursor = conn.cursor()
+   rows = cursor.fetchall()
+   return [dict(row) for row in rows]
     ```
 ---
 
 ### Phase 4: Serving (The Gateway)
-* **Log 7: Debugging 422 Unprocessable Entity Errors**
-    * **Prompt:** “I keep getting 422 errors when POSTing to my /books endpoint, even though the JSON looks correct. What’s wrong?”
-    * **Solution:** Diagnosed that the endpoint expected a List but received a single object. Updated the logic to handle both inputs.
-
-* **Log 8: Configuring CORS for Local Development**
-    * **Prompt:** “My frontend on localhost:3000 can’t call my backend on localhost:8000 due to CORS errors. I added the middleware but it's still failing.”
-    * **Solution:** Corrected the registration order and specified explicit origins for security.
-    ```python
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
-        allow_methods=["*"],
-    )
-    ```
+* **log 7: Uvicorn Server Setup**
+   * **Prompt:** "How do I run my FastAPI app so it reloads automatically when I change the code?"
+   * **Solution:** Recommended running the server via the command line using uvicorn main:app --reload.**
