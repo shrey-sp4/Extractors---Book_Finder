@@ -24,7 +24,7 @@ This log tracks technical interactions with the LLM to solve specific challenges
     * **Solution:** Use a replacement strategy to convert placeholder strings into actual null values for easy filtering.
 
 * **Log 4: Stripping HTML Tags**
-   * **Prompt:** "The book blurbs are full of <p> and &amp; tags. Can you give me a solution that cleans all HTML but keeps the text?"
+   * **Prompt:** "The book blurbs are full of <p>, &amp; tags. Can you give me a solution that cleans all HTML but keeps the text?"
    * **Solution:** Use a regex pattern to find anything between brackets and replace it with an empty string.
 
 ---
@@ -41,7 +41,6 @@ This log tracks technical interactions with the LLM to solve specific challenges
 * **Log 6: Managing Database Connections in FastAPI**
    * **Prompt:** "I noticed my database is getting too many open connections and slowing down. How do I make sure every session is closed automatically after a request is finished?"
    * **Solution:** Use a generator with an async with block to ensure the session is always closed in the finally block.
-
     ```Python
    
    # Session management in database.py
