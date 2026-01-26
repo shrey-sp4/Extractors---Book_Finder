@@ -15,7 +15,7 @@ The system stores data in a SQLite database (`data/books.db`) with the following
 | :--- | :--- | :--- |
 | `title` | TEXT | The title of the book. |
 | `author` | TEXT | The author or editor. |
-| `year` | TEXT | Publication year. |
+| `year` | SMALLINT | Publication year. |
 | `edition` | TEXT | Edition or volume information. |
 | `publisher` | TEXT | Publisher and place of publication. |
 | `isbn` | TEXT (UNIQUE) | Cleaned ISBN-10 or ISBN-13 (Primary Key equivalent). |
