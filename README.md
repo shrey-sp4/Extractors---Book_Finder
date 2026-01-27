@@ -37,7 +37,7 @@ Used for adding or updating individual books with automated enrichment.
 
 ## Data Statistics
 - **Initial Records**: 36,358 (Raw dataset)
-- **Cleaned Records**: 10,921 (After deduplication and description enrichment)
+- **Cleaned Records**: 10,921 (After deduplication and description ingestion)
 
 ## Setup & Execution
 1. **Install Dependencies**:
