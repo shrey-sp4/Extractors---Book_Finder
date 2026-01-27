@@ -35,6 +35,10 @@ Used for adding or updating individual books with automated enrichment.
 - **Trigger**: Send a `POST` request to `/sync` with the book's ISBN.
 - **Process**: The system automatically runs the full pipeline (Ingestion -> Transformation -> Storage) for that specific record.
 
+## Data Statistics
+- **Initial Records**: 36,358 (Raw dataset)
+- **Cleaned Records**: 10,921 (After deduplication and description enrichment)
+
 ## Setup & Execution
 1. **Install Dependencies**:
    ```bash
