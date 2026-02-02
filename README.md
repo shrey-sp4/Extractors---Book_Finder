@@ -36,8 +36,29 @@ Used for adding or updating individual books with automated enrichment.
 - **Process**: The system automatically runs the full pipeline (Ingestion -> Transformation -> Storage) for that specific record.
 
 ## Data Statistics
+
+The following insights are derived from the current state of `data/books.db`:
+
+### General Overview
 - **Initial Records**: 36,358 (Raw dataset)
-- **Cleaned Records**: 10,921 (After deduplication and description ingestion)
+- **Total Unique Books**: 10,922 (After deduplication and description enrichment)
+- **Unique Publishers**: 2,126
+- **Publication Year Range**: 1879 — 2025 (Average: 2004)
+
+### Description Metrics
+- **Average Description Length**: ~831 characters
+- **Longest Description**: 6,111 characters
+- **Shortest Description**: 7 characters
+- **Description Coverage**: 100% (All records in the current DB have descriptions)
+
+### Top Authors (by count)
+| Author | Books in DB |
+| :--- | :--- |
+| Tagore, Rabindranath | 16 |
+| Bourdieu, Pierre | 14 |
+| Stallings, William | 13 |
+| Singh, K. S. | 13 |
+| Lessing, Doris | 13 |
 
 ## Setup & Execution
 1. **Install Dependencies**:

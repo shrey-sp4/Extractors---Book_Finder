@@ -3,11 +3,11 @@ import sqlite3
 import os
 from typing import List, Optional
 from pydantic import BaseModel
-from .utils import run_book_pipeline
+from .utils import run_book_pipeline, normalize_isbn
 
 app = FastAPI(title="Book Serving API", description="API to fetch books with automated ingestion and transformation.")
 
-# Adjusting DB_PATH to be robust relative to the app directory
+# Adjusting DB_PATH 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data/books.db'))
 
 class SyncRequest(BaseModel):
@@ -41,7 +41,7 @@ def get_books(q: Optional[str] = Query(None, description="Search query for title
             words = q.strip().split()
             where_clauses = []
             for word in words:
-                # Using LOWER() ensures case-insensitivity for all character types
+                # Using LOWER()
                 where_clauses.append("(LOWER(title) LIKE LOWER(?) OR LOWER(author) LIKE LOWER(?))")
                 params.extend([f"%{word}%", f"%{word}%"])
             base_query += " WHERE " + " AND ".join(where_clauses)
@@ -85,14 +85,26 @@ def sync_data(request: SyncRequest):
         raise HTTPException(status_code=500, detail="Database not found")
 
     # 1. Running Pipeline (Ingestion + Transformation)
+    def clean_val(v):
+        return None if v == "string" else v
+
+    req_title = clean_val(request.title)
+    req_author = clean_val(request.author)
+
     pipeline_result = run_book_pipeline(
         isbn=request.isbn, 
-        title=request.title, 
-        author=request.author
+        title=req_title, 
+        author=req_author
     )
     
-    final_isbn = pipeline_result["isbn"] or request.isbn
-    description = pipeline_result["description"]
+    # Merge pipeline results with request data
+    final_isbn = normalize_isbn(request.isbn) or pipeline_result.get("isbn")
+    title = req_title or pipeline_result.get("title")
+    author = req_author or pipeline_result.get("author")
+    year = clean_val(request.year) or pipeline_result.get("year")
+    edition = clean_val(request.edition) or pipeline_result.get("edition")
+    publisher = clean_val(request.publisher) or pipeline_result.get("publisher")
+    description = pipeline_result.get("description")
     
     # 2. Storage
     conn = get_db_connection()
@@ -115,8 +127,8 @@ def sync_data(request: SyncRequest):
                 WHERE isbn = ?
             """
             conn.execute(query, (
-                request.title, request.author, request.year, 
-                request.edition, request.publisher, description, final_isbn
+                title, author, year, 
+                edition, publisher, description, final_isbn
             ))
         else:
             # Insert
@@ -125,8 +137,8 @@ def sync_data(request: SyncRequest):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """
             conn.execute(query, (
-                request.title, request.author, request.year, 
-                request.edition, request.publisher, final_isbn, description
+                title, author, year, 
+                edition, publisher, final_isbn, description
             ))
         
         conn.commit()
@@ -141,6 +153,9 @@ def sync_data(request: SyncRequest):
         "message": f"Book {final_isbn} processed through pipeline and saved.",
         "data": {
             "isbn": final_isbn,
+            "title": title,
+            "author": author,
+            "year": year,
             "description_found": description is not None
         }
     }
