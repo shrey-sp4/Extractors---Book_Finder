@@ -209,33 +209,60 @@ class RecommenderEngine:
             print(f"Reranking failed: {type(e).__name__}: {str(e)}")
             return candidates[:5] # Fallback to retrieval order
 
-    def explain_recommendations(self, query: str, final_books: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
-        """Step 3: Generate personalized summaries/explanations."""
-        if not final_books:
+    def get_curated_recommendations(self, query: str, candidates: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
+        """Unified method to rank, explain, and score recommendations in ONE LLM call."""
+        if not candidates:
             return []
 
-        for book in final_books:
-            prompt = f"""
-            User Query: "{query}"
-            Book Title: {book['title']}
-            Description: {book['description']}
-            
-            Briefly explain in 2-3 sentences why this book is a perfect match for the user's query and why it's worth picking up.
-            Be persuasive but honest.
-            """
-            try:
-                response = completion(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                book['explanation'] = response.choices[0].message.content.strip()
-            except Exception as e:
-                # Log the error so we can see what's failing
-                print(f"LLM explanation failed for '{book['title']}': {type(e).__name__}: {str(e)}")
-                # Fallback to showing the description if LLM fails
-                book['explanation'] = book.get('description', 'No description available.')[:400] + "..."
+        # Prepare context
+        candidate_text = ""
+        for i, c in enumerate(candidates):
+            candidate_text += f"[{i}] Title: {c['title']}\nDescription: {c.get('description', '')[:250]}...\n\n"
+
+        prompt = f"""
+        User Requirement: "{query}"
         
-        return final_books
+        Task: Out of these 20 candidates, pick the TOP 5 most relevant books.
+        For EACH of the top 5, you MUST provide:
+        1. Its index from the original list.
+        2. A 2-sentence explanation of why it fits the user's specific request.
+        3. A match score (0-100).
+        
+        Return ONLY a JSON object exactly like this:
+        {{
+          "recommendations": [
+            {{ "index": 3, "explanation": "...", "match_score": 95 }},
+            ...
+          ]
+        }}
+        
+        Candidates:
+        {candidate_text}
+        """
+
+        try:
+            response = completion(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"}
+            )
+            import json
+            result = json.loads(response.choices[0].message.content)
+            
+            final_books = []
+            if 'recommendations' in result:
+                for rec in result['recommendations']:
+                    idx = rec.get('index')
+                    if idx is not None and idx < len(candidates):
+                        book = candidates[idx].copy()
+                        book['explanation'] = rec.get('explanation', book.get('description', '')[:300])
+                        book['match_score'] = rec.get('match_score', 0)
+                        final_books.append(book)
+                return final_books[:5]
+        except Exception as e:
+            print(f"Curation failed: {e}")
+            # Fallback to simple top 5
+            return candidates[:5]
 
     def generate_match_scores(self, query: str, final_books: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
         """Generate match scores (0-100) for each recommended book."""
