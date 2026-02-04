@@ -2,11 +2,15 @@
 
 A complete pipeline to ingest, transform, store, and serve book data with automated enrichment.
 
+---
+
 ## Project Structure
 - `app/`: Modular pipeline logic (`pipeline.py`, `utils.py`) and FastAPI application (`main.py`).
 - `data/`: SQLite database (`books.db`) and raw CSV data files.
 - `notebooks/archive/`: Jupyter notebooks (archived).
 - `run.py`: Single entry point for all operations.
+
+---
 
 ## Setup & Execution
 
@@ -26,6 +30,8 @@ To start the FastAPI server (required for syncing and administrative tasks):
 ```bash
 python run.py serve
 ```
+
+---
 
 ## Deployment
 
@@ -54,6 +60,8 @@ The `run.py` script serves as the primary interface for managing the system:
 - **Search**: `python run.py search "query"` (Command-line search utility)
 - **Sync**: `python run.py sync <isbn>` (Manually ingest/update a book via its ISBN)
 - **Stats**: `python run.py stats` (View database and pipeline performance metrics)
+
+---
 
 ## Data Statistics
 The following insights are derived from the current state of the book database:
