@@ -1,0 +1,12 @@
+pandas
+fastapi
+uvicorn
+beautifulsoup4
+requests
+ftfy
+urllib3
+sentence-transformers
+faiss-cpu
+streamlit
+litellm
+python-dotenv

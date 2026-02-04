@@ -3,45 +3,55 @@
 A complete pipeline to ingest, transform, store, and serve book data with automated enrichment.
 
 ## Project Structure
-- `app/`: FastAPI application and modular pipeline logic (`utils.py`).
-- `data/`: SQLite database (`books.db`) and CSV data files.
-- `notebooks/`: Sequential Jupyter notebooks for bulk processing.
-- `logs/`: Project logs and history.
+- `app/`: Modular pipeline logic (`pipeline.py`, `utils.py`) and FastAPI application (`main.py`).
+- `data/`: SQLite database (`books.db`) and raw CSV data files.
+- `notebooks/archive/`: Jupyter notebooks (archived).
+- `run.py`: Single entry point for all operations.
 
-## Data Schema
-The system stores data in a SQLite database (`data/books.db`) with the following structure for the `books` table:
+## Setup & Execution
 
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `title` | TEXT | The title of the book. |
-| `author` | TEXT | The author or editor. |
-| `year` | SMALLINT | Publication year. |
-| `edition` | TEXT | Edition or volume information. |
-| `publisher` | TEXT | Publisher and place of publication. |
-| `isbn` | TEXT (UNIQUE) | Cleaned ISBN-10 or ISBN-13 (Primary Key equivalent). |
-| `description`| TEXT | Enriched and cleaned book description. |
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-## Data Pipeline
-The project supports two modes of data processing:
+### 2. Recommendation UI (Local)
+To start the discovery engine locally:
+```bash
+python run.py recommend
+```
 
-### 1. Bulk Ingestion (Notebooks)
-Used for processing large datasets (e.g., the initial 36k books). Run these in order:
-1. `01_ingestion.ipynb`: Fetches raw data and initial descriptions.
-2. `02_transformation.ipynb`: Cleans text and normalizes ISBNs.
-3. `03_storage.ipynb`: Creates the database and loads the cleaned data.
+### 3. API & Backend
+To start the FastAPI server (required for syncing and administrative tasks):
+```bash
+python run.py serve
+```
 
-### 2. Single-item Synchronization (API)
-Used for adding or updating individual books with automated enrichment.
-- **Trigger**: Send a `POST` request to `/sync` with the book's ISBN.
-- **Process**: The system automatically runs the full pipeline (Ingestion -> Transformation -> Storage) for that specific record.
+## Deployment
+
+### Streamlit Community Cloud
+This application is designed for easy deployment to Streamlit's cloud:
+
+1.  **Push to GitHub**: Ensure all code and the `data/` directory (containing `books.db`, `books_index.faiss`, and `books_metadata.pkl`) are pushed to your repository.
+2.  **Connect to Streamlit**: Sign in to [share.streamlit.io](https://share.streamlit.io) and link your GitHub repository.
+3.  **App Settings**: Set the main file path to `app/ui.py`.
+4.  **Secrets**: In the Streamlit dashboard, go to **Settings > Secrets** and add your API keys:
+    ```toml
+    GROQ_API_KEY = "your_key_here"
+    # or
+    OPENAI_API_KEY = "your_key_here"
+    ```
+
+---
+
+## CLI Commands
 
 ## Data Statistics
-
-The following insights are derived from the current state of `data/books.db`:
+The following insights are derived from the current state of the book database:
 
 ### General Overview
 - **Initial Records**: 36,358 (Raw dataset)
-- **Total Unique Books**: 10,922 (After deduplication and description enrichment)
+- **Total Unique Books**: 10,922 (After deduplication and enrichment)
 - **Unique Publishers**: 2,126
 - **Publication Year Range**: 1879 — 2025 (Average: 2004)
 
@@ -49,7 +59,7 @@ The following insights are derived from the current state of `data/books.db`:
 - **Average Description Length**: ~831 characters
 - **Longest Description**: 6,111 characters
 - **Shortest Description**: 7 characters
-- **Description Coverage**: 100% (All records in the current DB have descriptions)
+- **Description Coverage**: 100%
 
 ### Top Authors (by count)
 | Author | Books in DB |
@@ -60,13 +70,15 @@ The following insights are derived from the current state of `data/books.db`:
 | Singh, K. S. | 13 |
 | Lessing, Doris | 13 |
 
-## Setup & Execution
-1. **Install Dependencies**:
-   ```bash
-   pip install pandas fastapi uvicorn beautifulsoup4 requests ftfy
-   ```
-2. **Start the API**:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-3. **API Documentation**: Access `http://127.0.0.1:8000/docs` to test endpoints like `/books`, `/books/{isbn}`, and `/sync`.
+---
+
+## Data Schema
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `title` | TEXT | The title of the book. |
+| `author` | TEXT | The author or editor. |
+| `year` | SMALLINT | Publication year. |
+| `edition` | TEXT | Edition or volume information. |
+| `publisher` | TEXT | Publisher and place of publication. |
+| `isbn` | TEXT (UNIQUE) | Cleaned ISBN-10 or ISBN-13. |
+| `description`| TEXT | Enriched and cleaned book description. |
