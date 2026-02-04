@@ -45,6 +45,15 @@ This application is designed for easy deployment to Streamlit's cloud:
 ---
 
 ## CLI Commands
+The `run.py` script serves as the primary interface for managing the system:
+
+- **Recommend (UI)**: `python run.py recommend` (Starts the Streamlit discovery engine)
+- **Serve (API)**: `python run.py serve` (Starts the FastAPI backend)
+- **Setup**: `python run.py setup` (Runs the full ingestion and data enrichment pipeline)
+- **Index**: `python run.py index` (Rebuilds the FAISS semantic search index)
+- **Search**: `python run.py search "query"` (Command-line search utility)
+- **Sync**: `python run.py sync <isbn>` (Manually ingest/update a book via its ISBN)
+- **Stats**: `python run.py stats` (View database and pipeline performance metrics)
 
 ## Data Statistics
 The following insights are derived from the current state of the book database:
