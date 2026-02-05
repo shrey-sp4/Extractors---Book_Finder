@@ -167,3 +167,9 @@ The core of the "Book Finder" is a hybrid semantic search engine designed to fin
   <br>
   <em>Image 3: Showing the recommendations </em>
 </p>
+
+<p align="center">
+  <img src="images/4.jpeg" width="700"/>
+  <br>
+  <em>Image 4: Another query and its results </em>
+</p>
