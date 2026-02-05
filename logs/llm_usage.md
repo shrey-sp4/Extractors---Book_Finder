@@ -281,3 +281,289 @@ def sync_data(request: SyncRequest):
 ```
 
 This endpoint acts as the primary integration point between external data sources and persistent storage.
+
+## 9. Building a helper function (cli.py) file
+
+**User Prompt:**
+I need a command-line tool that helps me manage my books. It should allow me to search for books, get details using an ISBN, sync new books from the web, and start my FastAPI server. I also need it to run my data pipeline stages of ingestion, transformation and storage and show the database stats. Can you write the code for this?
+
+**LLM Response:**
+Here is the code for your requirements. This script uses argparse to create easy-to-use commands. It connects to your FastAPI server for live data and talks to your pipeline.py for big data tasks
+
+```python
+import argparse
+import requests
+import subprocess
+from .pipeline import run_full_pipeline, run_ingestion, run_transformation, run_storage, get_database_stats
+
+# The location of your running FastAPI server
+API_BASE_URL = "http://127.0.0.1:8000"
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Book Finder CLI Helper")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # Command: Search (by title/author)
+    search_parser = subparsers.add_parser("search", help="Search for books")
+    search_parser.add_argument("query", help="Search query")
+
+    # Command: Details (using ISBN)
+    details_parser = subparsers.add_parser("details", help="Get book details")
+    details_parser.add_argument("isbn", help="Book ISBN")
+
+    # Command: Sync (add new book from web)
+    sync_parser = subparsers.add_parser("sync", help="Sync a new book")
+    sync_parser.add_argument("isbn", help="Book ISBN")
+    sync_parser.add_argument("--title", help="Optional title")
+    sync_parser.add_argument("--author", help="Optional author")
+
+    # Command: Serve (start the server)
+    subparsers.add_parser("serve", help="Start the FastAPI server")
+
+    # Command: Setup (run the data pipeline)
+    setup_parser = subparsers.add_parser("setup", help="Run data pipeline")
+    setup_parser.add_argument("--stage", choices=["all", "ingest", "transform", "store"], default="all")
+    setup_parser.add_argument("--limit", type=int, help="Limit books processed")
+
+    # Command: Stats (see DB info)
+    subparsers.add_parser("stats", help="Show database stats")
+
+    # Command: Guide (help instructions)
+    subparsers.add_parser("guide", help="Show quick start guide")
+
+    return parser.parse_args()
+
+def search_books(query):
+    try:
+        response = requests.get(f"{API_BASE_URL}/books", params={"q": query})
+        response.raise_for_status()
+        books = response.json()
+        for b in books:
+            print(f"Title: {b.get('title')} | Author: {b.get('author')} | ISBN: {b.get('isbn')}")
+    except requests.exceptions.ConnectionError:
+        print("Error: Server is not running. Use 'serve' command first.")
+
+def start_server():
+    print("Starting FastAPI server...")
+    subprocess.run(["uvicorn", "app.main:app", "--reload"])
+
+def main():
+    args = get_args()
+    if args.command == "search":
+        search_books(args.query)
+    elif args.command == "serve":
+        start_server()
+    elif args.command == "stats":
+        get_database_stats()
+    # ... other commands follow same pattern
+    else:
+        print("Use --help to see all commands.")
+
+if __name__ == "__main__":
+    main()
+```
+
+## 10. Developing seamless semantic search
+
+**User Prompt:**
+I want to improve the recommendation part of my BookFinder project and develop a curated recommendation system so, instead of just showing a list, I want the AI to act like a curator. It should look at a list of potential books, pick the top 5, explain why they fit the user's request, and give each one a match score—all in a single step using JSON. How can I write a Python function to do this?
+
+**LLM Response:**
+Here is the function get_curated_recommendations. It creates a detailed prompt for the LLM and processes the JSON response to give the user a personalized and explained list of book suggestions.
+
+```python
+def get_curated_recommendations(self, query: str, candidates: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
+        """Unified method to rank, explain, and score recommendations in ONE LLM call."""
+        if not candidates:
+            return []
+
+        # Prepare context
+        candidate_text = ""
+        for i, c in enumerate(candidates):
+            candidate_text += f"[{i}] Title: {c['title']}\nDescription: {c.get('description', '')[:250]}...\n\n"
+
+        prompt = f"""
+        User Requirement: "{query}"
+ 
+        Task: Out of these 20 candidates, pick the TOP 5 most relevant books.
+        For EACH of the top 5, you MUST provide:
+        1. Its index from the original list.
+        2. A 2-sentence explanation of why it fits the user's specific request.
+        3. A match score (0-100).
+ 
+        Return ONLY a JSON object exactly like this:
+        {{
+          "recommendations": [
+            {{ "index": 3, "explanation": "...", "match_score": 95 }},
+            ...
+          ]
+        }}
+ 
+        Candidates:
+        {candidate_text}
+        """
+
+        try:
+            response = completion(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"}
+            )
+            import json
+            result = json.loads(response.choices[0].message.content)
+ 
+            final_books = []
+            if 'recommendations' in result:
+                for rec in result['recommendations']:
+                    idx = rec.get('index')
+                    if idx is not None and idx < len(candidates):
+                        book = candidates[idx].copy()
+                        book['explanation'] = rec.get('explanation', book.get('description', '')[:300])
+                        book['match_score'] = rec.get('match_score', 0)
+                        final_books.append(book)
+                return final_books[:5]
+        except Exception as e:
+            print(f"Curation failed: {e}")
+            # Fallback to simple top 5
+            return candidates[:5]
+```
+
+## 11. Fetching the book cover page images for the UI
+
+**User Prompt:**
+I want to add book cover images to my BookFinder project. I need a function that looks for a cover using the ISBN on Google Books. If that doesn't work, it should try Open Library. If it still can't find anything, it should try searching by the book's title and author. Finally, if no image is found at all, it should use a placeholder image. Can you write this for me?
+
+**LLM Response:**
+Here is the fetch_book_covers function. It uses a 'fallback' system, meaning it tries the best source first and moves to the next one only if it fails. This ensures most of your books will have a nice cover image.
+
+```python
+def fetch_book_covers(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Fetch book cover image URLs from Google Books and Open Library APIs."""
+        import requests
+ 
+        for book in books:
+            isbn = book.get('isbn')
+            cover_url = None
+ 
+            # Clean and validate ISBN
+            clean_isbn_val = clean_isbn(isbn)
+ 
+            if clean_isbn_val:
+                # Try Google Books API with cleaned ISBN
+                try:
+                    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{clean_isbn_val}"
+                    response = requests.get(url, timeout=5)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'items' in data and len(data['items']) > 0:
+                            image_links = data['items'][0].get('volumeInfo', {}).get('imageLinks', {})
+                            cover_url = image_links.get('thumbnail') or image_links.get('smallThumbnail')
+                except Exception as e:
+                    print(f"Google Books cover fetch failed for {clean_isbn_val}: {e}")
+ 
+                # Fallback to Open Library
+                if not cover_url:
+                    try:
+                        ol_url = f"https://covers.openlibrary.org/b/isbn/{clean_isbn_val}-M.jpg"
+                        response = requests.head(ol_url, timeout=3)
+                        if response.status_code == 200:
+                            cover_url = ol_url
+                    except Exception as e:
+                        print(f"Open Library cover fetch failed for {clean_isbn_val}: {e}")
+ 
+            # Fallback: Search by title and author if ISBN failed
+            if not cover_url and book.get('title'):
+                try:
+                    query = book['title']
+                    if book.get('author'):
+                        query += f" {book['author'].split(',')[0]}"
+                    url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=1"
+                    response = requests.get(url, timeout=5)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'items' in data and len(data['items']) > 0:
+                            image_links = data['items'][0].get('volumeInfo', {}).get('imageLinks', {})
+                            cover_url = image_links.get('thumbnail') or image_links.get('smallThumbnail')
+                except Exception as e:
+                    print(f"Title search cover fetch failed for '{book.get('title')}': {e}")
+ 
+            # Set cover URL or fallback to placeholder
+            book['cover_url'] = cover_url if cover_url else "https://via.placeholder.com/150x220.png?text=No+Cover"
+ 
+        return books
+```
+
+## 12. Building UI and Front-end for the recommender system
+
+**User Prompt:**
+I am building the frontend for my BookFinder project using Streamlit. I need to create a search interface where users can type in a theme or mood. When they search, I want to show a 'status' loading bar while the AI works. For the results, I want to display each book in a nice card format that includes the cover image, a match percentage score, and a personalized explanation from the AI. Can you show me how to implement this UI?
+
+**LLM Response:**
+Here is the Streamlit code for your UI. It handles the API keys, runs the recommendation engine, and uses custom HTML/CSS to build 'book cards.' This makes the results look like a professional web app instead of just a list of text.
+
+```python
+api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+query = st.text_input("", placeholder="Search by theme, mood, or niche topic (e.g., 'existential sci-fi about memory')", label_visibility="collapsed")
+
+if query:
+    recommender = get_cached_recommender()
+ 
+    if recommender.index is None:
+        st.error("Engine failure: Discovery index not available.")
+    else:
+        # Show a loading status while the AI thinks
+        with st.status("🔍 Curating your collection...", expanded=False) as status:
+            final_books = get_recommendations(query, api_key)
+            status.update(label="✨ Collection Curated", state="complete")
+
+        st.write("") # Spacer
+
+        # Loop through each book and create a visual card
+        for book in final_books:
+            match_score_html = ""
+            if 'match_score' in book:
+                score = int(book['match_score'])
+                match_class = "high-match" if score >= 85 else ""
+                match_score_html = f'<div class="match-label {match\_class}">{score}% Match</div>'
+
+            formatted_isbn = format_isbn_display(book.get('isbn'))
+            author = book.get('author', 'Unknown Author')
+            explanation = book.get('explanation', book.get('description', '')[:300] + "...")
+            cover_url = book.get('cover_url', 'https://via.placeholder.com/150x220.png?text=No+Cover')
+
+            # Building the HTML for the card
+            card_html = f"""
+            <div class="book-card">
+                <img src="{cover\_url}" />
+                <div class="book-info">
+                    {match_score_html}
+                    <div class="book-title">{book['title']}</div>
+                    <div class="book-author">By {author} | ISBN: {formatted_isbn}</div>
+                    <div class="book-explanation">{explanation}</div>
+                </div>
+            </div>
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
+```
+
+## 13. Creating a file for executing the entire setup
+
+**User Prompt:**
+I want to make a single Python script to run my whole BookFinder project. I want it to do everything: start the server, run the data setup, or search for books. How do I make it so 'serve' happens automatically if I don't type a command, but still let me pass extra options like a limit for the data?
+
+**LLM Response:**
+You can use argparse to create a 'one-stop runner.' By setting nargs='?', you make the command optional, and parse_known_args() allows the script to be flexible with extra flags. Here is the code to set that up:
+
+```python
+def main():
+    parser = argparse.ArgumentParser(description="Book Finder - One-stop runner")
+    parser.add_argument("command", nargs="?", default="serve", choices=["serve", "setup", "search", "details", "sync", "guide", "stats", "index", "recommend"],
+                        help="Command to run (default: serve)")
+    parser.add_argument("--stage", choices=["all", "ingest", "transform", "store"], default="all", help="Stage for setup")
+    parser.add_argument("--limit", type=int, help="Limit for setup")
+ 
+    # Capture all other args
+    args, unknown = parser.parse_known_args()
+```
+
