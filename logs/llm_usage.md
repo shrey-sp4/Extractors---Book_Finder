@@ -567,3 +567,18 @@ def main():
     args, unknown = parser.parse_known_args()
 ```
 
+## 14. Deploying model on streamlit
+
+**User Prompt:**
+I finished my BookFinder app and it works on my computer. How do I actually put it on the internet using Streamlit
+
+**LLM Response:**
+The easiest way is to use Streamlit Community Cloud. You just need to put your code on GitHub and connect it to Streamlit. It will give you a link to share with everyone.
+
+Steps to Deploy:
+1. Upload to GitHub: Put your project files (like app.py, requirements.txt, and your data folders) into a GitHub repository.
+2. Sign in to Streamlit: Go to share.streamlit.io and log in with your GitHub account.
+3. Deploy: Click 'New app,' select your repository, and hit 'Deploy.'
+4. Add Secrets: If you are using API keys (like Groq or OpenAI), make sure to add them in the 'Secrets' settings on the Streamlit dashboard so the app can see them.
+
+
