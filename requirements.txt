@@ -7,6 +7,6 @@ ftfy
 urllib3
 sentence-transformers
 faiss-cpu
-streamlit
+streamlit>=1.40.0
 litellm
 python-dotenv
