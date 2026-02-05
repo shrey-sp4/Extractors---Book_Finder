@@ -5,7 +5,7 @@ A complete pipeline to ingest, transform, store, and serve book data with automa
 ---
 
 ## Project Structure
-- `app/`: Modular pipeline logic (`pipeline.py`, `utils.py`) and FastAPI application (`main.py`).
+- `app/`: Modular pipeline logic (`pipeline.py`, `utils.py`), core recommender logic (`recommender.py`), CLI interface (`cli.py`), web UI (`ui.py`), and FastAPI application (`main.py`).
 - `data/`: SQLite database (`books.db`) and raw CSV data files.
 - `notebooks/archive/`: Jupyter notebooks (archived).
 - `run.py`: Single entry point for all operations.
