@@ -99,3 +99,49 @@ The following insights are derived from the current state of the book database:
 | `publisher` | TEXT | Publisher and place of publication. |
 | `isbn` | TEXT (UNIQUE) | Cleaned ISBN-10 or ISBN-13. |
 | `description`| TEXT | Enriched and cleaned book description. |
+
+---
+
+## System Architecture & Flow
+
+The system operates in three main stages: **Ingest**, **Index**, and **Serve**.
+
+1.  **Ingestion & Enlightenment**:
+    -   Raw book data is read from CSV files.
+    -   The system attempts to fetch enriched metadata (Abstracts, Covers, Keywords) from multiple external sources:
+        -   **Google Books API**
+        -   **Open Library API**
+        -   **OpenAlex** (Abstracts)
+    -   Data is cleaned (ftfy), normalized, and stored in a SQLite database (`books.db`).
+
+2.  **Semantic Indexing**:
+    -   We use `sentence-transformers` (Model: `all-MiniLM-L6-v2`) to generate vector embeddings for every book description.
+    -   These embeddings are stored in a **FAISS** index (`books_index.faiss`) for ultra-fast similarity search.
+
+3.  **Discovery Engine (Recommendation)**:
+    -   User enters a natural language query (e.g., "philosophical sci-fi about memory").
+    -   The engine converts the query into a vector and finds the nearest neighbors in the FAISS index.
+    -   Results are reranked (see below) and displayed in a modern Streamlit UI.
+
+---
+
+## Recommendation System Features
+
+The core of the "Book Finder" is a hybrid semantic search engine designed to find books based on *meaning* rather than just keywords.
+
+### 1. Vector Search (Retrieval)
+-   **Technology**: FAISS (Facebook AI Similarity Search) + Sentence Transformers.
+-   **Process**: Converts the user's search query into a high-dimensional vector and retrieves the top 20 semantically similar books from the database. This allows it to understand concepts like "coming of age" or "dystopian society" even if those exact words aren't in the book description.
+
+### 2. Intelligent Scoring (Cosine Similarity)
+-   **Match Score**: Instead of arbitrary ranking, we calculate the exact **Cosine Similarity** (0-100%) between your query and the book's content.
+-   This score represents how mathematically close the book's themes are to your request.
+
+### 3. LLM Reranking & Explanation (Optional)
+-   If an API Key (Gemini, Groq, or OpenAI) is provided, the top results are sent to a Large Language Model (e.g., **Gemini 1.5 Flash**).
+-   **Reranking**: The LLM analyzes the specific nuances of your query to re-order the books based on relevance.
+-   **Explanation**: The LLM writes a personalized "Why this book?" blurb, explaining exactly why it fits your search criteria.
+
+### 4. Rich Visuals
+-   **Cover Art**: Automatically fetches high-quality cover images from Google Books and Open Library.
+-   **Fallback**: If an ISBN is missing or invalid, the system intelligently searches by Title + Author to ensure a cover is found.
