@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import faiss
 import pickle
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, util
 from litellm import completion
 from typing import List, Dict, Any
 from dotenv import load_dotenv
@@ -20,6 +20,16 @@ API_URL = "http://127.0.0.1:8000/books"  # FastAPI endpoint
 
 DEFAULT_MODEL = "all-MiniLM-L6-v2"
 
+# Determine default LLM based on API keys
+# Priority: Gemini > Groq > OpenAI
+DEFAULT_LLM_MODEL = "groq/llama-3.1-8b-instant" # Default fallback
+if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+    DEFAULT_LLM_MODEL = "gemini/gemini-1.5-flash"
+elif os.getenv("GROQ_API_KEY"):
+    DEFAULT_LLM_MODEL = "groq/llama-3.1-8b-instant"
+elif os.getenv("OPENAI_API_KEY"):
+    DEFAULT_LLM_MODEL = "gpt-4o-mini"
+
 def clean_isbn(isbn):
     """Clean and validate ISBN for API calls."""
     if not isbn or isinstance(isbn, float) and pd.isna(isbn):
@@ -27,7 +37,7 @@ def clean_isbn(isbn):
     
     isbn_str = str(isbn)
     
-    # Handle scientific notation (e.g., 9.78354E+12)
+    # Handle scientific notation 
     if 'E' in isbn_str or 'e' in isbn_str:
         try:
             isbn_str = f"{float(isbn_str):.0f}"
@@ -209,112 +219,66 @@ class RecommenderEngine:
             print(f"Reranking failed: {type(e).__name__}: {str(e)}")
             return candidates[:5] # Fallback to retrieval order
 
-    def get_curated_recommendations(self, query: str, candidates: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
-        """Unified method to rank, explain, and score recommendations in ONE LLM call."""
-        if not candidates:
-            return []
-
-        # Prepare context
-        candidate_text = ""
-        for i, c in enumerate(candidates):
-            candidate_text += f"[{i}] Title: {c['title']}\nDescription: {c.get('description', '')[:250]}...\n\n"
-
-        prompt = f"""
-        User Requirement: "{query}"
-        
-        Task: Out of these 20 candidates, pick the TOP 5 most relevant books.
-        For EACH of the top 5, you MUST provide:
-        1. Its index from the original list.
-        2. A 2-sentence explanation of why it fits the user's specific request.
-        3. A match score (0-100).
-        
-        Return ONLY a JSON object exactly like this:
-        {{
-          "recommendations": [
-            {{ "index": 3, "explanation": "...", "match_score": 95 }},
-            ...
-          ]
-        }}
-        
-        Candidates:
-        {candidate_text}
-        """
-
-        try:
-            response = completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            import json
-            result = json.loads(response.choices[0].message.content)
-            
-            final_books = []
-            if 'recommendations' in result:
-                for rec in result['recommendations']:
-                    idx = rec.get('index')
-                    if idx is not None and idx < len(candidates):
-                        book = candidates[idx].copy()
-                        book['explanation'] = rec.get('explanation', book.get('description', '')[:300])
-                        book['match_score'] = rec.get('match_score', 0)
-                        final_books.append(book)
-                return final_books[:5]
-        except Exception as e:
-            print(f"Curation failed: {e}")
-            # Fallback to simple top 5
-            return candidates[:5]
-
-    def generate_match_scores(self, query: str, final_books: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
-        """Generate match scores (0-100) for each recommended book."""
+    def explain_recommendations(self, query: str, final_books: List[Dict[str, Any]], model: str = "groq/llama-3.3-70b-versatile") -> List[Dict[str, Any]]:
+        """Step 3: Generate personalized summaries/explanations."""
         if not final_books:
             return []
 
-        # Prepare book list for scoring
-        books_text = ""
-        for i, book in enumerate(final_books):
-            books_text += f"[{i}] Title: {book['title']}\nAuthor: {book.get('author', 'Unknown')}\nDescription: {book['description'][:200]}...\n\n"
+        for book in final_books:
+            prompt = f"""
+            User Query: "{query}"
+            Book Title: {book['title']}
+            Description: {book['description']}
+            
+            Briefly explain in 2-3 sentences why this book is a perfect match for the user's query and why it's worth picking up.
+            Be persuasive but honest.
+            """
+            try:
+                response = completion(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                book['explanation'] = response.choices[0].message.content.strip()
+            except Exception as e:
+                # Log the error so we can see what's failing
+                print(f"LLM explanation failed for '{book['title']}': {type(e).__name__}: {str(e)}")
+                # Fallback to showing the FULL description if LLM fails
+                book['explanation'] = book.get('description', 'No description available.')
+        
+        return final_books
 
-        prompt = f"""
-        User Query: "{query}"
-        
-        Below are {len(final_books)} recommended books. For each book, provide a match score from 0-100 indicating how likely the user is to enjoy this book based on their query.
-        
-        Consider:
-        - Relevance to the query
-        - Quality and appeal of the book
-        - How well it matches the user's interests
-        
-        Return ONLY a JSON object with this exact format:
-        {{"scores": [{{"index": 0, "score": 95}}, {{"index": 1, "score": 88}}, ...]}}
-        
-        Books:
-        {books_text}
-        """
+    def generate_match_scores(self, query: str, final_books: List[Dict[str, Any]], model: str = DEFAULT_LLM_MODEL) -> List[Dict[str, Any]]:
+        """Generate match scores (0-100) using Cosine Similarity."""
+        if not final_books:
+            return []
 
         try:
-            response = completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            import json
-            content = response.choices[0].message.content
-            result = json.loads(content)
+            # Encode user query
+            query_embedding = self.model.encode(query, convert_to_tensor=True)
             
-            # Apply scores to books
-            if 'scores' in result:
-                for score_data in result['scores']:
-                    idx = score_data.get('index')
-                    score = score_data.get('score', 0)
-                    if idx is not None and idx < len(final_books):
-                        final_books[idx]['match_score'] = min(100, max(0, score))  # Clamp to 0-100
+            # Encode book descriptions/titles
+            book_texts = [f"{b['title']} {b.get('description', '')}" for b in final_books]
+            book_embeddings = self.model.encode(book_texts, convert_to_tensor=True)
             
-        except Exception as e:
-            print(f"Match score generation failed: {type(e).__name__}: {str(e)}")
-            # Fallback: use inverse of semantic search distance as score
+            # Calculate cosine similarities
+            cosine_scores = util.cos_sim(query_embedding, book_embeddings)[0]
+            
+            # Assign scores
             for i, book in enumerate(final_books):
-                # Higher rank = higher score (simple fallback)
-                book['match_score'] = max(0, 100 - (i * 15))
+                # Scale from [-1, 1] to [0, 100] approximately, considering most matches will be positive
+                raw_score = cosine_scores[i].item()
+                # Normalize typical range 0.2-0.8 to 40-95 roughly
+                score = int(max(0, min(100, raw_score * 100))) 
+                
+                score = min(99, int(score * 1.2) + 20)
+                
+                book['match_score'] = score
+                
+        except Exception as e:
+            print(f"Cosine similarity scoring failed: {e}")
+            # Fallback
+            for i, book in enumerate(final_books):
+                 book['match_score'] = max(0, 95 - (i * 5))
         
         return final_books
 
@@ -345,7 +309,7 @@ class RecommenderEngine:
                 # Fallback to Open Library
                 if not cover_url:
                     try:
-                        ol_url = f"https://covers.openlibrary.org/b/isbn/{clean_isbn_val}-M.jpg"
+                        ol_url = f"https://covers.openlibrary.org/b/isbn/{clean_isbn_val}-M.jpg?default=false"
                         response = requests.head(ol_url, timeout=3)
                         if response.status_code == 200:
                             cover_url = ol_url
@@ -354,6 +318,7 @@ class RecommenderEngine:
             
             # Fallback: Search by title and author if ISBN failed
             if not cover_url and book.get('title'):
+                # 1. Google Books Search
                 try:
                     query = book['title']
                     if book.get('author'):
@@ -367,7 +332,25 @@ class RecommenderEngine:
                             cover_url = image_links.get('thumbnail') or image_links.get('smallThumbnail')
                 except Exception as e:
                     print(f"Title search cover fetch failed for '{book.get('title')}': {e}")
-            
+                
+                # 2. Open Library Search (Last Resort)
+                if not cover_url:
+                    try:
+                        search_url = "https://openlibrary.org/search.json"
+                        params = {'title': book['title'], 'limit': 1}
+                        if book.get('author'):
+                            params['author'] = book['author'].split(',')[0]
+                        
+                        resp = requests.get(search_url, params=params, timeout=5)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            if data.get('docs'):
+                                cover_i = data['docs'][0].get('cover_i')
+                                if cover_i:
+                                    cover_url = f"https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"
+                    except Exception as e:
+                        print(f"OL Search cover fetch failed: {e}")
+                                
             # Set cover URL or fallback to placeholder
             book['cover_url'] = cover_url if cover_url else "https://via.placeholder.com/150x220.png?text=No+Cover"
         
