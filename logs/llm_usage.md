@@ -282,6 +282,8 @@ def sync_data(request: SyncRequest):
 
 This endpoint acts as the primary integration point between external data sources and persistent storage.
 
+---
+
 ## 9. Building a helper function (cli.py) file
 
 **User Prompt:**
@@ -363,6 +365,8 @@ if __name__ == "__main__":
     main()
 ```
 
+---
+
 ## 10. Developing seamless semantic search
 
 **User Prompt:**
@@ -427,6 +431,8 @@ def get_curated_recommendations(self, query: str, candidates: List[Dict[str, Any
             # Fallback to simple top 5
             return candidates[:5]
 ```
+
+---
 
 ## 11. Fetching the book cover page images for the UI
 
@@ -547,6 +553,8 @@ if query:
             st.markdown(card_html, unsafe_allow_html=True)
 ```
 
+---
+
 ## 13. Creating a file for executing the entire setup
 
 **User Prompt:**
@@ -567,6 +575,8 @@ def main():
     args, unknown = parser.parse_known_args()
 ```
 
+---
+
 ## 14. Deploying model on streamlit
 
 **User Prompt:**
@@ -581,4 +591,4 @@ Steps to Deploy:
 3. Deploy: Click 'New app,' select your repository, and hit 'Deploy.'
 4. Add Secrets: If you are using API keys (like Groq or OpenAI), make sure to add them in the 'Secrets' settings on the Streamlit dashboard so the app can see them.
 
-
+---
