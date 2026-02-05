@@ -8,7 +8,7 @@ load_dotenv()
 
 st.set_page_config(page_title="Book Finder", page_icon="📚", layout="wide")
 
-@st.cache_resource
+@st.cache_resource(show_spinner = False)
 def get_cached_recommender():
     return get_recommender()
 
