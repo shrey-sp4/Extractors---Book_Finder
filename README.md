@@ -145,3 +145,25 @@ The core of the "Book Finder" is a hybrid semantic search engine designed to fin
 ### 4. Rich Visuals
 -   **Cover Art**: Automatically fetches high-quality cover images from Google Books and Open Library.
 -   **Fallback**: If an ISBN is missing or invalid, the system intelligently searches by Title + Author to ensure a cover is found.
+
+---
+
+## UI Demo Images
+
+<p align="center">
+  <img src="images/1.png" width="700"/>
+  <br>
+  <em>Image 1: Prompting query from the user </em>
+</p>
+
+<p align="center">
+  <img src="images/2.png" width="700"/>
+  <br>
+  <em>Image 2: User being updated after entering the query </em>
+</p>
+
+<p align="center">
+  <img src="images/3.png" width="700"/>
+  <br>
+  <em>Image 3: Showing the recommendations </em>
+</p>
