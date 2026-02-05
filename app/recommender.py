@@ -270,7 +270,7 @@ class RecommenderEngine:
                 # Normalize typical range 0.2-0.8 to 40-95 roughly
                 score = int(max(0, min(100, raw_score * 100))) 
                 
-                score = min(99, int(score * 1.2) + 20)
+                score = min(99, int(score * 1.2) + 35)
                 
                 book['match_score'] = score
                 
