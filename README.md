@@ -4,6 +4,10 @@ A complete pipeline to ingest, transform, store, and serve book data with automa
 
 ---
 
+🔗 **Deployed URL:** [Book Recommender Web App](https://extractors-bookfinder.streamlit.app/)
+
+---
+
 ## Project Structure
 - `app/`: Modular pipeline logic (`pipeline.py`, `utils.py`), core recommender logic (`recommender.py`), CLI interface (`cli.py`), web UI (`ui.py`), and FastAPI application (`main.py`).
 - `data/`: SQLite database (`books.db`) and raw CSV data files.
@@ -137,7 +141,7 @@ The core of the "Book Finder" is a hybrid semantic search engine designed to fin
 -   **Match Score**: Instead of arbitrary ranking, we calculate the exact **Cosine Similarity** (0-100%) between your query and the book's content.
 -   This score represents how mathematically close the book's themes are to your request.
 
-### 3. LLM Reranking & Explanation (Optional)
+### 3. LLM Reranking & Explanation
 -   If an API Key (Gemini, Groq, or OpenAI) is provided, the top results are sent to a Large Language Model (e.g., **Gemini 1.5 Flash**).
 -   **Reranking**: The LLM analyzes the specific nuances of your query to re-order the books based on relevance.
 -   **Explanation**: The LLM writes a personalized "Why this book?" blurb, explaining exactly why it fits your search criteria.
